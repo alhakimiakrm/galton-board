@@ -1,77 +1,61 @@
-import pygame 
-from sys import exit
+import pygame
+import pymunk
+import pymunk.pygame_util
+from settings import *
+from player import Player
+from particle import Particle
+import level
+
+PLAYER_SPEED = 200
+JUMP_IMPULSE = 200
 
 pygame.init()
-screen = pygame.display.set_mode((1920, 1080)) 
-pygame.display.set_caption('Asphalt Escapade')                  # initialize pygame, set caption and window
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Particle Scroller")
 clock = pygame.time.Clock()
 
-backdrop = pygame.image.load('asphalt-escapade/backdrops/city.png').convert_alpha()
-backdrop = pygame.transform.scale(backdrop, (1920, 1080))
+# Pymunk setup
+space = pymunk.Space()
+space.gravity = GRAVITY
+draw_options = pymunk.pygame_util.DrawOptions(screen)
 
-low_level_enemy = pygame.image.load('asphalt-escapade/characters/l1.png').convert_alpha()
-low_level_enemy = pygame.transform.scale(low_level_enemy, (350, 400))
-low_level_enemy_original = low_level_enemy
-low_level_enemy_rect = low_level_enemy.get_rect(bottomright = (1500, 1100))
-low_level_enemy_x = 1200                                                                    #low level enemy initialization
-low_level_enemy_y = 750
-enemy_speed = 6
-enemy_direction = -1
+# Game setup
+player = Player(space, (WIDTH / 2, HEIGHT / 2))
+level.create_ground(space)
 
-rex = pygame.image.load('asphalt-escapade/characters/rex.png').convert_alpha()
-rex = pygame.transform.scale(rex, (250, 250))
-rex_rect = rex.get_rect(topleft = (550, 800))
-rex_speed = 5                                                                           #main playable character initialization 
-move_left = move_right = move_up = move_down = False
-rex_original = rex
-rex_facing_right = True 
-
-
-while True:
+# Main game loop
+running = True
+while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            pygame.quit()                                   #main loop, exit init
-            exit()
-           
-           #------------------------------------------- 
-        elif event.type == pygame.KEYDOWN:              
-            if event.key == pygame.K_a:
-                move_left = True
-                if rex_facing_right:
-                    rex = pygame.transform.flip(rex_original, True, False)
-                    rex_original = rex
-                    rex_facing_right = False                                                            
-            elif event.key == pygame.K_d:
-                move_right = True                                                           #movement 
-                if not rex_facing_right:
-                    rex = pygame.transform.flip(rex_original, True, False)
-                    rex_original = rex
-                    rex_facing_right = True                       
-        elif event.type == pygame.KEYUP:
-            if event.key == pygame.K_a:
-                move_left = False
-            elif event.key == pygame.K_d:
-                move_right = False             
-    if move_right:
-        rex_rect.x += rex_speed
-    if move_left:
-        rex_rect.x -= rex_speed
-        #----------------------------------------------------        
-        
-    
-    screen.blit(backdrop, (0, 0))
-    low_level_enemy_x += enemy_speed * enemy_direction
-    if low_level_enemy_x <= 800 or low_level_enemy_x >= 1200:
-        enemy_direction *= -1                                                                       #enemy movement and logic
-        low_level_enemy = pygame.transform.flip(low_level_enemy_original, True, False)
-        low_level_enemy_original = low_level_enemy
-        
-    print(rex_rect.colliderect(low_level_enemy_rect))
-    
-    #playable character blit
-    screen.blit(low_level_enemy, low_level_enemy_rect)
-    screen.blit(rex, rex_rect)
-    
-    pygame.display.update()
-    clock.tick(60)
+            running = False
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Add a particle at the current mouse position
+            Particle(space, event.pos)
+            
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_a]:
+        player.move_left(PLAYER_SPEED)
+    if keys[pygame.K_d]:
+        player.move_right(PLAYER_SPEED)
+    if keys[pygame.K_SPACE]:  # Changed from pygame.K_w to pygame.K_SPACE for jump
+        player.jump(JUMP_IMPULSE)
 
+
+    # Game logic goes here
+
+    # Update Pymunk space
+    space.step(1 / FPS)
+
+    # Drawing
+    screen.fill((0, 0, 0))  # Clear screen with black
+    player.draw(screen)
+    for shape in space.shapes:
+        if isinstance(shape, pymunk.Circle) and shape != player.shape:
+            pos = int(shape.body.position.x), int(shape.body.position.y)
+            pygame.draw.circle(screen, PARTICLE_COLOR, pos, shape.radius)
+
+    pygame.display.flip()  # Update the display
+    clock.tick(FPS)
+
+pygame.quit()
